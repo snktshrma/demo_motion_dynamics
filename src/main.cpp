@@ -1,51 +1,73 @@
 #include "demo_motion_dynamics/iss_dynamics_orbit.hpp"
-#include <rclcpp/rclcpp.hpp>
+#include <fstream>
+#include <iostream>
+// #include <rclcpp/rclcpp.hpp>
 
 int main(int argc, char ** argv)
 {
-  (void) argc;
-  (void) argv;
+    // rclcpp::init(argc, argv);
 
-  iss_dynamics dyn;
+    iss_dynamics dyn;
 
-  iss_dynamics::state x0;
-  x0.p = 0.0;
-  x0.q = 0.001;
-  x0.r = 0.0;
-  x0.phi = 0.0;
-  x0.theta = 0.0;
-  x0.psi = 0.0;
-  x0.deltas = Eigen::VectorXd::Zero(4);
+    iss_dynamics::state x0;
+    x0.x  = 0.0;      // initial x at the orbit radius
+    x0.y  = 0.0;
+    x0.z  = 7.0e6;
+    // For a circular orbit, velocity magnitude v = sqrt(mu / rOrbit)
+    // vel vector perpendicular to pos vector for circular orbit.
+    double mu     = 3.986004418e14;
+    double rOrbit = 7.0e6;
+    double v_circ = std::sqrt(mu / rOrbit);
+    double v_elip = std::sqrt(mu*((2/rOrbit) - (1/7.5e-6)));
+    x0.vx = v_circ * std::cos(0.3);
+    x0.vy = v_circ * std::sin(0.3);
+    x0.vz = 0.0;
 
-  iss_dynamics::ssParm par;
-  par.Ixx = 10.0;
-  par.Iyy = 12.0;
-  par.Izz = 9.0;
-  par.Ixy = 0.0;
-  par.Ixz = 0.0;
-  par.Iyz = 0.0;
-  par.mu = 3.986004418e14;
-  par.rOrbit = 7.0e6;
-  par.T_cmg << 1, 1, 0;
+    iss_dynamics::ssParm par;
+    par.mu = mu;
+    par.rOrbit = rOrbit;
+    par.Cd = 2.2;
+    par.A = 4; //m^2
+    par.mass = 500; //kg
+    par.pressure = 1.57e-5; //as per NRLMSISE-00
+    par.temp = 2000; //K
 
-  double dt = 0.1;
-  int steps = 7000;
-  iss_dynamics::state x = x0;
+    double dt = 0.1;
+    int steps = 100000;
+    iss_dynamics::state x = x0;
 
-  std::ofstream file("ss_data.csv");
-  file << "time,p,q,r,phi,theta,psi,delta1,delta2,delta3,delta4\n";
+    std::ofstream file("ss_data.csv");
+    if (!file.is_open()) {
+        std::cerr << "Error opening output file." << std::endl;
+        return -1;
+    }
 
-  for(int i = 0; i <= steps; ++i)
-  {
-      double t = i * dt;
-      file << t << "," 
-           << x.p << "," << x.q << "," << x.r << ","
-           << x.phi << "," << x.theta << "," << x.psi << ","
-           << x.deltas(0) << "," << x.deltas(1) << "," << x.deltas(2) << "," << x.deltas(3) << "\n";
+    file << "time,x,y,z,vx,vy,vz\n";
 
-      if(i < steps) x = dyn.rk4Step(x, par, dt);
-  }
+    for (int i = 0; i <= steps; ++i)
+    {
+        double t = i * dt;
+        file << t << "," 
+             << x.x << "," << x.y << "," << x.z << ","
+             << x.vx << "," << x.vy << "," << x.vz << "\n";
 
-  file.close();
-  return 0;
+        if (i < steps) {
+            double earthRadius = 6378137.0;
+            double r = std::sqrt(x.x * x.x + x.y * x.y + x.z * x.z);
+            
+            if (r <= earthRadius) {
+                x.x *= earthRadius / r;
+                x.y *= earthRadius / r;
+                x.z *= earthRadius / r;
+                x.vx = 0.0;
+                x.vy = 0.0;
+                x.vz = 0.0;
+            }
+            x = dyn.rk4Step(x, par, dt);
+          }
+    }
+
+    file.close();
+
+    return 0;
 }
