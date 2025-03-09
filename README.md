@@ -47,7 +47,7 @@ Here it can be seen as soon as ISS loses it's tangential orbital velocity, it fe
 - All the forces and dynamics are modelled wrt to inertial frame and output is in cartesian coordinate system
   
 ### TODO:
-- Add more external forces like solar radiation pressure, gaussian-noise, etc
+- Add more perturbation like solar radiation pressure, gaussian-noise, etc
 - Shift to ROS2 and visualise the output live as the solver solves the equations
 - Consider a rotational earth frame
 - Add polar coordinate system for more observability
